@@ -9,7 +9,9 @@ export async function uploadFileToDrive(
   filename: string,
   mimeType: string = 'application/octet-stream'
 ): Promise<{ fileId: string; webViewLink: string }> {
-  const drive = google.drive({ version: 'v3', auth: { access_token: accessToken } });
+  const auth = new google.auth.OAuth2();
+  auth.setCredentials({ access_token: accessToken });
+  const drive = google.drive({ version: 'v3', auth });
 
   try {
     // Find or create FileAxa Downloads folder
