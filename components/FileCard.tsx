@@ -14,7 +14,7 @@ interface FileCardProps {
 }
 
 export default function FileCard({
-  id,
+  _id,
   title,
   filexaUrl,
   addedAt,
