@@ -123,37 +123,37 @@ export class FilexaClient {
   }
 }
 
-export function decryptCredentials(encrypted: string, key: string): {
-  email: string;
-  password: string;
-} {
-  try {
-    const buf = Buffer.from(encrypted, 'base64');
-    const decrypted = Buffer.allocUnsafe(buf.length);
+// export function decryptCredentials(encrypted: string, key: string): {
+//   email: string;
+//   password: string;
+// } {
+//   try {
+//     const buf = Buffer.from(encrypted, 'base64');
+//     const decrypted = Buffer.allocUnsafe(buf.length);
 
-    for (let i = 0; i < buf.length; i++) {
-      decrypted[i] = buf[i] ^ key.charCodeAt(i % key.length);
-    }
+//     for (let i = 0; i < buf.length; i++) {
+//       decrypted[i] = buf[i] ^ key.charCodeAt(i % key.length);
+//     }
 
-    const json = decrypted.toString('utf-8');
-    return JSON.parse(json);
-  } catch {
-    throw new Error('Failed to decrypt credentials');
-  }
-}
+//     const json = decrypted.toString('utf-8');
+//     return JSON.parse(json);
+//   } catch {
+//     throw new Error('Failed to decrypt credentials');
+//   }
+// }
 
-export function encryptCredentials(
-  email: string,
-  password: string,
-  key: string
-): string {
-  const json = JSON.stringify({ email, password });
-  const buf = Buffer.from(json, 'utf-8');
-  const encrypted = Buffer.allocUnsafe(buf.length);
+// export function encryptCredentials(
+//   email: string,
+//   password: string,
+//   key: string
+// ): string {
+//   const json = JSON.stringify({ email, password });
+//   const buf = Buffer.from(json, 'utf-8');
+//   const encrypted = Buffer.allocUnsafe(buf.length);
 
-  for (let i = 0; i < buf.length; i++) {
-    encrypted[i] = buf[i] ^ key.charCodeAt(i % key.length);
-  }
+//   for (let i = 0; i < buf.length; i++) {
+//     encrypted[i] = buf[i] ^ key.charCodeAt(i % key.length);
+//   }
 
-  return encrypted.toString('base64');
-}
+//   return encrypted.toString('base64');
+// }

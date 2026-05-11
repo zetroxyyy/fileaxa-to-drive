@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { encryptCredentials } from '@/lib/fileaxa';
+import { encryptCredentials } from '@/lib/crypto';
 
 interface FilexaCredentialsModalProps {
   isOpen: boolean;
