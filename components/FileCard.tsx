@@ -111,7 +111,7 @@ export default function FileCard({
         >
           {result.success ? (
             <div className="flex items-center justify-between gap-2">
-              <span>✓ Uploaded to Drive!</span>
+              <span>Done ✓ Sent to Drive</span>
               {result.webViewLink && (
                 <a
                   href={result.webViewLink}
@@ -134,7 +134,7 @@ export default function FileCard({
         disabled={transferring}
         className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white font-medium py-2 px-4 rounded transition-colors"
       >
-        {transferring ? 'Transferring...' : 'Download to Drive'}
+        {transferring ? 'Sending to Drive...' : 'Download to Drive'}
       </button>
     </div>
   );

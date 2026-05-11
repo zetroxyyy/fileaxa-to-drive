@@ -4,6 +4,9 @@ import { uploadFileToDrive, getMimeType } from '@/lib/drive';
 import { FilexaClient } from '@/lib/fileaxa';
 import { decryptCredentials } from '@/lib/crypto';
 
+export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
