@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 import { uploadFileToDrive, getMimeType } from '@/lib/drive';
-import { FilexaClient, decryptCredentials } from '@/lib/fileaxa';
+import { FilexaClient } from '@/lib/fileaxa';
+import { decryptCredentials } from '@/lib/crypto';
 
 export async function POST(request: NextRequest) {
   try {

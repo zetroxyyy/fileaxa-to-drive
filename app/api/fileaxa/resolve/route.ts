@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { FilexaClient, decryptCredentials } from '@/lib/fileaxa';
+import { FilexaClient } from '@/lib/fileaxa';
+import { decryptCredentials } from '@/lib/crypto';
 
 export async function POST(request: NextRequest) {
   try {
