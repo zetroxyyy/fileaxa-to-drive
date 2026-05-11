@@ -21,7 +21,7 @@ export default function Home() {
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [links, setLinks] = useState<Link[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
   const [newLinkTitle, setNewLinkTitle] = useState('');
   const [newLinkUrl, setNewLinkUrl] = useState('');
   const [addingLink, setAddingLink] = useState(false);
