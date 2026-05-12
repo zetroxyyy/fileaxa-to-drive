@@ -12,8 +12,6 @@ interface Link {
   addedAt: string;
 }
 
-const SITE_PASSWORD = process.env.NEXT_PUBLIC_SITE_PASSWORD || 'change_me_123';
-
 export default function Home() {
   const { data: session, status } = useSession();
 
@@ -61,9 +59,17 @@ export default function Home() {
     }
   }, [authenticated]);
 
+  const checkPassword = (input: string) => {
+    const correctPassword =
+      process.env.NEXT_PUBLIC_SITE_PASSWORD ||
+      process.env.SITE_PASSWORD ||
+      'admin';
+    return input === correctPassword;
+  };
+
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === SITE_PASSWORD) {
+    if (checkPassword(password)) {
       localStorage.setItem('siteAuth', 'true');
       setAuthenticated(true);
       setPassword('');
@@ -147,7 +153,7 @@ export default function Home() {
           </form>
 
           <p className="text-xs text-gray-500 mt-6 text-center">
-            Change SITE_PASSWORD in .env.local for security
+            Change NEXT_PUBLIC_SITE_PASSWORD in Railway variables
           </p>
         </div>
       </div>
