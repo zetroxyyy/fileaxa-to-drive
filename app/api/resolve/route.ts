@@ -2,9 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { FilexaClient } from '@/lib/fileaxa';
 import { decryptCredentials } from '@/lib/crypto';
 
-export const maxDuration = 60;
-export const dynamic = 'force-dynamic';
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -47,11 +44,11 @@ export async function POST(request: NextRequest) {
       throw error;
     }
   } catch (error) {
-    console.error('Transfer endpoint error:', error);
+    console.error('Resolve endpoint error:', error);
     const errorMessage =
-      error instanceof Error ? error.message : 'Transfer failed';
+      error instanceof Error ? error.message : 'Failed to resolve file';
     return NextResponse.json(
-      { error: `Transfer failed: ${errorMessage}` },
+      { error: `Failed to resolve file: ${errorMessage}` },
       { status: 500 }
     );
   }

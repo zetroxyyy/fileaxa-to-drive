@@ -13,6 +13,14 @@ interface FileCardProps {
   onTransferComplete?: () => void;
 }
 
+interface TransferStatus {
+  stage: 'idle' | 'resolving' | 'uploading';
+  success: boolean;
+  fileId?: string;
+  webViewLink?: string;
+  error?: string;
+}
+
 export default function FileCard({
   id: _id,
   title,
@@ -23,51 +31,125 @@ export default function FileCard({
   onTransferComplete,
 }: FileCardProps) {
   const [transferring, setTransferring] = useState(false);
-  const [result, setResult] = useState<{
-    success: boolean;
-    fileId?: string;
-    webViewLink?: string;
-    error?: string;
-  } | null>(null);
+  const [status, setStatus] = useState<TransferStatus>({
+    stage: 'idle',
+    success: false,
+  });
 
   const handleTransfer = async () => {
     setTransferring(true);
-    setResult(null);
+    setStatus({ stage: 'resolving', success: false });
 
     try {
-      const response = await fetch('/api/transfer', {
+      // Step 1: Resolve FileAxa URL to get direct download link
+      const resolveResponse = await fetch('/api/resolve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           filexaUrl,
-          filename: title,
-          googleAccessToken,
           encryptedCredentials,
         }),
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setResult({
-          success: true,
-          fileId: data.fileId,
-          webViewLink: data.webViewLink,
-        });
-        onTransferComplete?.();
-      } else {
-        setResult({
-          success: false,
-          error: data.error || 'Transfer failed',
-        });
+      if (!resolveResponse.ok) {
+        const responseText = await resolveResponse.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(responseText);
+        } catch {
+          throw new Error(responseText || 'Failed to resolve file');
+        }
+        throw new Error(errorData.error || 'Failed to resolve file');
       }
+
+      const resolveData = await resolveResponse.json();
+      const { directUrl, filename } = resolveData;
+
+      // Step 2: Upload to Google Drive
+      setStatus({ stage: 'uploading', success: false });
+
+      const driveResponse = await uploadToGoogleDrive(
+        directUrl,
+        filename,
+        googleAccessToken
+      );
+
+      setStatus({
+        stage: 'uploading',
+        success: true,
+        fileId: driveResponse.fileId,
+        webViewLink: driveResponse.webViewLink,
+      });
+      onTransferComplete?.();
     } catch (error) {
-      setResult({
+      setStatus({
+        stage: 'idle',
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       });
     } finally {
       setTransferring(false);
+    }
+  };
+
+  const uploadToGoogleDrive = async (
+    directUrl: string,
+    filename: string,
+    accessToken: string
+  ): Promise<{ fileId: string; webViewLink: string }> => {
+    try {
+      // Fetch file as blob
+      const fileResponse = await fetch(directUrl, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+      });
+
+      if (!fileResponse.ok) {
+        throw new Error('Failed to download file');
+      }
+
+      const blob = await fileResponse.blob();
+
+      // Create multipart form data
+      const metadata = {
+        name: filename,
+        parents: ['root'],
+      };
+
+      const form = new FormData();
+      form.append(
+        'metadata',
+        new Blob([JSON.stringify(metadata)], { type: 'application/json' })
+      );
+      form.append('file', blob);
+
+      // Upload to Google Drive
+      const uploadResponse = await fetch(
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: form,
+        }
+      );
+
+      if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        throw new Error(`Upload failed: ${errorText}`);
+      }
+
+      const result = await uploadResponse.json();
+      return {
+        fileId: result.id,
+        webViewLink: result.webViewLink,
+      };
+    } catch (error) {
+      console.error('Google Drive upload error:', error);
+      throw error;
     }
   };
 
@@ -99,33 +181,47 @@ export default function FileCard({
         </a>
       </div>
 
-      {transferring && <TransferProgress />}
-
-      {result && !transferring && (
-        <div
-          className={`p-3 rounded mb-4 text-sm ${
-            result.success
-              ? 'bg-green-900 text-green-100'
-              : 'bg-red-900 text-red-100'
-          }`}
-        >
-          {result.success ? (
-            <div className="flex items-center justify-between gap-2">
-              <span>Done ✓ Sent to Drive</span>
-              {result.webViewLink && (
-                <a
-                  href={result.webViewLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-300 hover:text-blue-200 underline whitespace-nowrap"
-                >
-                  View
-                </a>
-              )}
+      {transferring && (
+        <div className="mb-4 p-3 bg-blue-900 text-blue-100 rounded text-sm">
+          <div className="flex items-center gap-2">
+            <div className="animate-spin">⚙️</div>
+            <div>
+              <p className="font-medium">
+                {status.stage === 'resolving'
+                  ? 'Resolving FileAxa link...'
+                  : 'Uploading to Google Drive...'}
+              </p>
+              <p className="text-blue-200 text-xs mt-1">
+                {status.stage === 'resolving'
+                  ? 'Getting direct download URL'
+                  : 'Uploading file to Drive'}
+              </p>
             </div>
-          ) : (
-            <span>{result.error}</span>
-          )}
+          </div>
+        </div>
+      )}
+
+      {!transferring && status.success && (
+        <div className="p-3 rounded mb-4 text-sm bg-green-900 text-green-100">
+          <div className="flex items-center justify-between gap-2">
+            <span>Done ✓ Sent to Drive</span>
+            {status.webViewLink && (
+              <a
+                href={status.webViewLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-300 hover:text-blue-200 underline whitespace-nowrap"
+              >
+                View
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+
+      {!transferring && status.error && (
+        <div className="p-3 rounded mb-4 text-sm bg-red-900 text-red-100">
+          <span>{status.error}</span>
         </div>
       )}
 
