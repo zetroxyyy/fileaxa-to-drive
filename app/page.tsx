@@ -60,10 +60,7 @@ export default function Home() {
   }, [authenticated]);
 
   const checkPassword = (input: string) => {
-    const correctPassword =
-      process.env.NEXT_PUBLIC_SITE_PASSWORD ||
-      process.env.SITE_PASSWORD ||
-      'admin';
+    const correctPassword = process.env.NEXT_PUBLIC_SITE_PASSWORD || 'admin';
     return input === correctPassword;
   };
 
@@ -305,7 +302,7 @@ export default function Home() {
         isOpen={credentialsModal}
         onClose={() => setCredentialsModal(false)}
         onSave={handleSaveCredentials}
-        sitePassword={SITE_PASSWORD}
+        sitePassword={process.env.NEXT_PUBLIC_SITE_PASSWORD || ''}
       />
     </div>
   );
