@@ -22,10 +22,8 @@ export class FilexaClient {
     });
   }
 
-  async getCsrfToken(): Promise<string> {
+  async getCsrfToken(signal?: AbortSignal): Promise<string> {
     const startTime = Date.now();
-    const controller = new AbortController();
-    setTimeout(() => controller.abort(), 85000);
     try {
       const res = await fetch('https://fileaxa.com/login', {
         headers: {
@@ -35,7 +33,7 @@ export class FilexaClient {
             'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
           'Accept-Language': 'en-US,en;q=0.9',
         },
-        signal: controller.signal,
+        signal,
       });
       // Parse ALL set-cookie headers
       const rawHeaders = res.headers.getSetCookie?.() || [];
@@ -59,12 +57,10 @@ export class FilexaClient {
     }
   }
 
-  async login(username: string, password: string): Promise<boolean> {
+  async login(username: string, password: string, signal?: AbortSignal): Promise<boolean> {
     const startTime = Date.now();
-    const token = await this.getCsrfToken();
+    const token = await this.getCsrfToken(signal);
     console.log(`getCsrfToken took ${Date.now() - startTime}ms in login()`);
-    const controller = new AbortController();
-    setTimeout(() => controller.abort(), 85000);
     try {
       const body = new URLSearchParams();
       body.append('username', username);
@@ -89,7 +85,7 @@ export class FilexaClient {
         },
         body,
         redirect: 'manual',
-        signal: controller.signal,
+        signal,
       });
 
       const rawHeaders = res.headers.getSetCookie?.() || [];
@@ -109,11 +105,10 @@ export class FilexaClient {
   }
 
   async getDirectDownloadUrl(
-    filePageUrl: string
+    filePageUrl: string,
+    signal?: AbortSignal
   ): Promise<{ url: string; filename: string } | null> {
     const startTime = Date.now();
-    const controller = new AbortController();
-    setTimeout(() => controller.abort(), 85000);
     try {
       console.log('Fetching file page with cookies:', this.getCookieString());
       const res = await fetch(filePageUrl, {
@@ -125,7 +120,7 @@ export class FilexaClient {
           'Referer': 'https://fileaxa.com',
           'Cookie': this.getCookieString(),
         },
-        signal: controller.signal,
+        signal,
       });
 
       const html = await res.text();
@@ -204,12 +199,23 @@ export class FilexaClient {
     password: string
   ): Promise<{ url: string; filename: string } | null> {
     console.log('=== resolveFileUrl START ===');
-    const loginOk = await this.login(username, password);
-    console.log('Login result:', loginOk);
-    if (!loginOk) throw new Error('Invalid FileAxa credentials');
-    const result = await this.getDirectDownloadUrl(filexaUrl);
-    console.log('Resolve result:', result);
-    return result;
+    // Single global timeout for entire operation: 85 seconds
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      console.error('resolveFileUrl: Global timeout fired after 85 seconds');
+      controller.abort();
+    }, 85000);
+
+    try {
+      const loginOk = await this.login(username, password, controller.signal);
+      console.log('Login result:', loginOk);
+      if (!loginOk) throw new Error('Invalid FileAxa credentials');
+      const result = await this.getDirectDownloadUrl(filexaUrl, controller.signal);
+      console.log('Resolve result:', result);
+      return result;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 }
 
