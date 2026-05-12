@@ -16,24 +16,24 @@ export default function FilexaCredentialsModal({
   onSave,
   sitePassword,
 }: FilexaCredentialsModalProps) {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   const handleSave = () => {
-    if (!email || !password) {
-      setError('Please enter both email and password');
+    if (!username || !password) {
+      setError('Please enter both username and password');
       return;
     }
 
     try {
       const encrypted = encryptCredentials(
-        email,
+        username,
         password,
         'FILEAXA_KEY_' + sitePassword
       );
       onSave(encrypted);
-      setEmail('');
+      setUsername('');
       setPassword('');
       setError('');
       onClose();
@@ -52,12 +52,12 @@ export default function FilexaCredentialsModal({
         </h2>
 
         <div className="mb-4">
-          <label className="block text-sm text-gray-300 mb-2">Email</label>
+          <label className="block text-sm text-gray-300 mb-2">Username</label>
           <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="your@email.com"
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="your_username"
             className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500"
           />
         </div>

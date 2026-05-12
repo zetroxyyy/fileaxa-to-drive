@@ -15,13 +15,13 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const { email, password } = decryptCredentials(
+      const { username, password } = decryptCredentials(
         encryptedCredentials,
         'FILEAXA_KEY_' + (process.env.NEXT_PUBLIC_SITE_PASSWORD || 'default')
       );
 
       const client = new FilexaClient();
-      const result = await client.resolveFileUrl(filexaUrl, email, password);
+      const result = await client.resolveFileUrl(filexaUrl, username, password);
 
       if (!result) {
         return NextResponse.json(

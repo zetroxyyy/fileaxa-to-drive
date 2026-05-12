@@ -21,12 +21,12 @@ export class FilexaClient {
     });
   }
 
-  async login(email: string, password: string): Promise<boolean> {
+  async login(username: string, password: string): Promise<boolean> {
     try {
       const response = await this.axiosInstance.post(
         'https://fileaxa.com/login',
         new URLSearchParams({
-          email,
+          username,
           password,
           remember: '1',
         }),
@@ -111,10 +111,10 @@ export class FilexaClient {
 
   async resolveFileUrl(
     filexaUrl: string,
-    email: string,
+    username: string,
     password: string
   ): Promise<FilexaFile | null> {
-    const loginSuccess = await this.login(email, password);
+    const loginSuccess = await this.login(username, password);
     if (!loginSuccess) {
       throw new Error('Invalid FileAxa credentials');
     }

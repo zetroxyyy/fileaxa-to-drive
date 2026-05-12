@@ -24,7 +24,6 @@ export default function Home() {
   const [_loading, setLoading] = useState(true);
   const [newLinkTitle, setNewLinkTitle] = useState('');
   const [newLinkUrl, setNewLinkUrl] = useState('');
-  const [addingLink, setAddingLink] = useState(false);
   const [credentialsModal, setCredentialsModal] = useState(false);
   const [encryptedCredentials, setEncryptedCredentials] = useState('');
   const [linkError, setLinkError] = useState('');
@@ -38,10 +37,17 @@ export default function Home() {
     setLoading(false);
   }, []);
 
-  // Load links
+  // Load links from localStorage
   useEffect(() => {
     if (authenticated) {
-      fetchLinks();
+      try {
+        const saved = localStorage.getItem('fileaxa_links');
+        if (saved) {
+          setLinks(JSON.parse(saved));
+        }
+      } catch (error) {
+        console.error('Failed to load links:', error);
+      }
     }
   }, [authenticated]);
 
@@ -54,16 +60,6 @@ export default function Home() {
       }
     }
   }, [authenticated]);
-
-  const fetchLinks = async () => {
-    try {
-      const response = await fetch('/api/links');
-      const data = await response.json();
-      setLinks(data);
-    } catch (error) {
-      console.error('Failed to fetch links:', error);
-    }
-  };
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,43 +74,40 @@ export default function Home() {
     }
   };
 
-  const handleAddLink = async (e: React.FormEvent) => {
+  const handleAddLink = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newLinkTitle || !newLinkUrl) {
       setLinkError('Please fill in all fields');
       return;
     }
 
-    setAddingLink(true);
     try {
-      const response = await fetch('/api/links', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: newLinkTitle,
-          filexaUrl: newLinkUrl,
-        }),
-      });
+      const newLink: Link = {
+        id: Date.now().toString(),
+        title: newLinkTitle,
+        filexaUrl: newLinkUrl,
+        addedAt: new Date().toISOString(),
+      };
 
-      if (response.ok) {
-        const newLink = await response.json();
-        setLinks([...links, newLink]);
-        setNewLinkTitle('');
-        setNewLinkUrl('');
-        setLinkError('');
-      } else {
-        setLinkError('Failed to add link');
-      }
+      const updatedLinks = [...links, newLink];
+      setLinks(updatedLinks);
+      localStorage.setItem('fileaxa_links', JSON.stringify(updatedLinks));
+      setNewLinkTitle('');
+      setNewLinkUrl('');
+      setLinkError('');
     } catch (error) {
       setLinkError('Error adding link');
-    } finally {
-      setAddingLink(false);
     }
   };
 
   const handleSaveCredentials = (encrypted: string) => {
     localStorage.setItem('filexaCredentials', encrypted);
     setEncryptedCredentials(encrypted);
+  };
+
+  const handleTransferComplete = () => {
+    // Links are stored in localStorage, no need to refresh from API
+    // This callback is just for UI updates if needed
   };
 
   if (!authenticated) {
@@ -252,10 +245,9 @@ export default function Home() {
             />
             <button
               type="submit"
-              disabled={addingLink}
-              className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-medium rounded transition-colors whitespace-nowrap"
+              className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-medium rounded transition-colors whitespace-nowrap\"
             >
-              {addingLink ? 'Adding...' : 'Add Link'}
+              Add Link
             </button>
           </form>
           {linkError && (
@@ -295,7 +287,7 @@ export default function Home() {
                 addedAt={link.addedAt}
                 encryptedCredentials={encryptedCredentials}
                 googleAccessToken={session?.user?.accessToken || ''}
-                onTransferComplete={fetchLinks}
+                onTransferComplete={handleTransferComplete}
               />
             ))}
           </div>

@@ -21,14 +21,14 @@ export async function POST(request: NextRequest) {
 
     try {
       // Decrypt FileAxa credentials
-      const { email, password } = decryptCredentials(
+      const { username, password } = decryptCredentials(
         encryptedCredentials,
         'FILEAXA_KEY_' + (process.env.NEXT_PUBLIC_SITE_PASSWORD || 'default')
       );
 
       // Step 1: Resolve FileAxa download URL
       const filexaClient = new FilexaClient();
-      const fileInfo = await filexaClient.resolveFileUrl(filexaUrl, email, password);
+      const fileInfo = await filexaClient.resolveFileUrl(filexaUrl, username, password);
 
       if (!fileInfo) {
         return NextResponse.json(
