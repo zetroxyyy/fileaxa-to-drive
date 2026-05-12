@@ -23,7 +23,10 @@ export default function Home() {
   const [newLinkTitle, setNewLinkTitle] = useState('');
   const [newLinkUrl, setNewLinkUrl] = useState('');
   const [credentialsModal, setCredentialsModal] = useState(false);
-  const [encryptedCredentials, setEncryptedCredentials] = useState('');
+  const [filexaCredentials, setFilexaCredentials] = useState<{
+    username: string;
+    password: string;
+  } | null>(null);
   const [linkError, setLinkError] = useState('');
 
   // Check password on mount
@@ -54,7 +57,11 @@ export default function Home() {
     if (authenticated) {
       const saved = localStorage.getItem('filexaCredentials');
       if (saved) {
-        setEncryptedCredentials(saved);
+        try {
+          setFilexaCredentials(JSON.parse(saved));
+        } catch (error) {
+          console.error('Failed to parse credentials:', error);
+        }
       }
     }
   }, [authenticated]);
@@ -103,9 +110,9 @@ export default function Home() {
     }
   };
 
-  const handleSaveCredentials = (encrypted: string) => {
-    localStorage.setItem('filexaCredentials', encrypted);
-    setEncryptedCredentials(encrypted);
+  const handleSaveCredentials = (creds: { username: string; password: string }) => {
+    localStorage.setItem('filexaCredentials', JSON.stringify(creds));
+    setFilexaCredentials(creds);
   };
 
   const handleTransferComplete = () => {
@@ -157,7 +164,7 @@ export default function Home() {
     );
   }
 
-  const hasCredentials = !!encryptedCredentials;
+  const hasCredentials = !!filexaCredentials;
   const isGoogleConnected = status === 'authenticated' && session?.user?.accessToken;
 
   return (
@@ -288,7 +295,7 @@ export default function Home() {
                 title={link.title}
                 filexaUrl={link.filexaUrl}
                 addedAt={link.addedAt}
-                encryptedCredentials={encryptedCredentials}
+                filexaCredentials={filexaCredentials}
                 googleAccessToken={session?.user?.accessToken || ''}
                 onTransferComplete={handleTransferComplete}
               />

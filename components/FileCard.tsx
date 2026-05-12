@@ -3,12 +3,17 @@
 import { useState } from 'react';
 import TransferProgress from './TransferProgress';
 
+interface Credentials {
+  username: string;
+  password: string;
+}
+
 interface FileCardProps {
   id: string;
   title: string;
   filexaUrl: string;
   addedAt: string;
-  encryptedCredentials: string;
+  filexaCredentials: Credentials | null;
   googleAccessToken: string;
   onTransferComplete?: () => void;
 }
@@ -26,7 +31,7 @@ export default function FileCard({
   title,
   filexaUrl,
   addedAt,
-  encryptedCredentials,
+  filexaCredentials,
   googleAccessToken,
   onTransferComplete,
 }: FileCardProps) {
@@ -37,6 +42,15 @@ export default function FileCard({
   });
 
   const handleTransfer = async () => {
+    if (!filexaCredentials) {
+      setStatus({
+        stage: 'idle',
+        success: false,
+        error: 'FileAxa credentials not set',
+      });
+      return;
+    }
+
     setTransferring(true);
     setStatus({ stage: 'resolving', success: false });
 
@@ -47,7 +61,8 @@ export default function FileCard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           filexaUrl,
-          encryptedCredentials,
+          username: filexaCredentials.username,
+          password: filexaCredentials.password,
         }),
       });
 

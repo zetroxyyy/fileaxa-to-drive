@@ -1,12 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { encryptCredentials } from '@/lib/crypto';
+
+interface Credentials {
+  username: string;
+  password: string;
+}
 
 interface FilexaCredentialsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (encrypted: string) => void;
+  onSave: (credentials: Credentials) => void;
   sitePassword: string;
 }
 
@@ -14,7 +18,7 @@ export default function FilexaCredentialsModal({
   isOpen,
   onClose,
   onSave,
-  sitePassword,
+  sitePassword: _sitePassword,
 }: FilexaCredentialsModalProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -27,12 +31,7 @@ export default function FilexaCredentialsModal({
     }
 
     try {
-      const encrypted = encryptCredentials(
-        username,
-        password,
-        'FILEAXA_KEY_' + sitePassword
-      );
-      onSave(encrypted);
+      onSave({ username, password });
       setUsername('');
       setPassword('');
       setError('');
@@ -80,7 +79,7 @@ export default function FilexaCredentialsModal({
         )}
 
         <div className="text-sm text-gray-400 mb-6 p-3 bg-gray-700 rounded">
-          ✓ Credentials are encrypted locally. Never stored on server.
+          ✓ Credentials stored in browser memory. Never sent to server unencrypted.
         </div>
 
         <div className="flex gap-3">
