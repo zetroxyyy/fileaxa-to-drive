@@ -44,7 +44,17 @@ export default function Home() {
       try {
         const saved = localStorage.getItem('fileaxa_links');
         if (saved) {
-          setLinks(JSON.parse(saved));
+          const parsed = JSON.parse(saved);
+          // Deduplicate by filexaUrl
+          const unique = parsed.filter(
+            (link: Link, index: number, self: Link[]) =>
+              index === self.findIndex((l) => l.filexaUrl === link.filexaUrl)
+          );
+          setLinks(unique);
+          // Save deduped list back
+          if (unique.length < parsed.length) {
+            localStorage.setItem('fileaxa_links', JSON.stringify(unique));
+          }
         }
       } catch (error) {
         console.error('Failed to load links:', error);

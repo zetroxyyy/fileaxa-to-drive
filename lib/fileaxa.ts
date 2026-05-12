@@ -1,216 +1,192 @@
 import * as cheerio from 'cheerio';
 
-interface FilexaFile {
-  url: string;
-  filename: string;
-}
-
 export class FilexaClient {
-  private cookies: string = '';
+  private cookies: Record<string, string> = {};
 
-  private async fetchWithTimeout(
-    url: string,
-    options: RequestInit = {},
-    timeoutMs: number = 15000
-  ): Promise<Response> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  private getCookieString(): string {
+    return Object.entries(this.cookies)
+      .map(([k, v]) => `${k}=${v}`)
+      .join('; ');
+  }
 
-    try {
-      return await fetch(url, {
-        ...options,
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeout);
-    }
+  private parseCookies(setCookieHeader: string | null): void {
+    if (!setCookieHeader) return;
+    setCookieHeader.split(',').forEach((cookie) => {
+      const parts = cookie.split(';')[0].trim();
+      const eqIndex = parts.indexOf('=');
+      if (eqIndex > 0) {
+        const key = parts.substring(0, eqIndex).trim();
+        const value = parts.substring(eqIndex + 1).trim();
+        if (key) this.cookies[key] = value;
+      }
+    });
   }
 
   async getCsrfToken(): Promise<string> {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 15000);
     try {
-      console.log('Fetching CSRF token from login page...');
-      const response = await this.fetchWithTimeout(
-        'https://fileaxa.com/login',
-        {
-          method: 'GET',
-          headers: {
-            'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept':
-              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-          },
+      const res = await fetch('https://fileaxa.com/login', {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept':
+            'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
         },
-        10000
-      );
+        signal: controller.signal,
+      });
+      // Parse ALL set-cookie headers
+      const rawHeaders = res.headers.getSetCookie?.() || [];
+      rawHeaders.forEach((c: string) => this.parseCookies(c));
+      // Also try single header
+      this.parseCookies(res.headers.get('set-cookie'));
 
-      // Save initial cookies
-      const setCookie = response.headers.get('set-cookie');
-      if (setCookie) {
-        this.cookies = setCookie
-          .split(',')
-          .map((c: string) => c.split(';')[0].trim())
-          .filter((c: string) => c.includes('='))
-          .join('; ');
-        console.log('Initial cookies saved from CSRF page');
-      }
-
-      const html = await response.text();
+      const html = await res.text();
       const $ = cheerio.load(html);
-      const token = $('input[name="_token"]').attr('value') || '';
-      console.log('CSRF token extracted:', token ? 'yes' : 'no');
+      const token =
+        $('input[name="_token"]').attr('value') ||
+        $('meta[name="csrf-token"]').attr('content') ||
+        '';
+      console.log('CSRF token:', token ? 'found' : 'not found');
+      console.log('Cookies after GET:', this.getCookieString());
       return token;
-    } catch (error) {
-      console.error('Error fetching CSRF token:', error);
+    } catch (e: any) {
+      console.error('getCsrfToken error:', e.message);
       return '';
     }
   }
 
   async login(username: string, password: string): Promise<boolean> {
+    const token = await this.getCsrfToken();
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 15000);
     try {
-      console.log('FileAxa login attempt for user:', username);
-      const csrfToken = await this.getCsrfToken();
+      const body = new URLSearchParams();
+      body.append('username', username);
+      body.append('password', password);
+      body.append('remember', '1');
+      if (token) body.append('_token', token);
 
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
+      console.log('Attempting login with cookie:', this.getCookieString());
 
-      try {
-        const response = await fetch('https://fileaxa.com/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept':
-              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Referer': 'https://fileaxa.com/login',
-            'Origin': 'https://fileaxa.com',
-            'Cookie': this.cookies,
-          },
-          body: new URLSearchParams({
-            username,
-            password,
-            remember: '1',
-            ...(csrfToken && { _token: csrfToken }),
-          }),
-          redirect: 'manual',
-          signal: controller.signal,
-        });
+      const res = await fetch('https://fileaxa.com/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept':
+            'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Referer': 'https://fileaxa.com/login',
+          'Origin': 'https://fileaxa.com',
+          'Cookie': this.getCookieString(),
+        },
+        body,
+        redirect: 'manual',
+        signal: controller.signal,
+      });
 
-        clearTimeout(timeout);
+      const rawHeaders = res.headers.getSetCookie?.() || [];
+      rawHeaders.forEach((c: string) => this.parseCookies(c));
+      this.parseCookies(res.headers.get('set-cookie'));
 
-        console.log('Login response status:', response.status);
-        console.log(
-          'Login response headers:',
-          Object.fromEntries(response.headers.entries())
-        );
+      console.log('Login status:', res.status);
+      console.log('Cookies after login:', this.getCookieString());
 
-        // Extract and save cookies
-        const setCookie = response.headers.get('set-cookie');
-        console.log('Set-Cookie header present:', !!setCookie);
-        if (setCookie) {
-          this.cookies = setCookie
-            .split(',')
-            .map((c: string) => c.split(';')[0].trim())
-            .filter((c: string) => c.includes('='))
-            .join('; ');
-          console.log('Cookies updated from login response');
-        }
-
-        // Success if redirect (302) or ok (200)
-        const success = response.status === 302 || response.status === 200;
-        console.log('Login success:', success);
-        return success;
-      } finally {
-        clearTimeout(timeout);
-      }
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
-        console.error('FileAxa login TIMEOUT after 15 seconds');
-      } else {
-        console.error('FileAxa login failed:', error.message);
-      }
+      const hasCookies = Object.keys(this.cookies).length > 0;
+      return res.status === 302 || res.status === 200 || hasCookies;
+    } catch (e: any) {
+      console.error('Login error:', e.message);
       return false;
     }
   }
 
-  async getDirectDownloadUrl(filePageUrl: string): Promise<FilexaFile | null> {
+  async getDirectDownloadUrl(
+    filePageUrl: string
+  ): Promise<{ url: string; filename: string } | null> {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 15000);
     try {
-      console.log('Fetching file page:', filePageUrl);
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
+      console.log('Fetching file page with cookies:', this.getCookieString());
+      const res = await fetch(filePageUrl, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept':
+            'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Referer': 'https://fileaxa.com',
+          'Cookie': this.getCookieString(),
+        },
+        signal: controller.signal,
+      });
 
-      try {
-        const response = await fetch(filePageUrl, {
-          headers: {
-            'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Cookie': this.cookies,
-            'Referer': 'https://fileaxa.com',
-            'Accept':
-              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          },
-          signal: controller.signal,
+      const html = await res.text();
+      console.log('File page HTML length:', html.length);
+
+      const $ = cheerio.load(html);
+      let downloadUrl = '';
+      let filename = '';
+
+      filename =
+        $('meta[property="og:title"]').attr('content') ||
+        $('h1').first().text().trim() ||
+        $('title').text().trim() ||
+        'download';
+
+      // Try multiple selectors for download link
+      const selectors = [
+        'a[href*="/download/"]',
+        'a[href*="download"]',
+        'a[download]',
+        'a.btn-success',
+        'a.btn-primary',
+        'a.download-btn',
+        'a.btn[href*="fileaxa"]',
+        '.download-link a',
+        '#download-link',
+      ];
+
+      for (const sel of selectors) {
+        const el = $(sel).first();
+        if (el.length) {
+          downloadUrl = el.attr('href') || '';
+          if (downloadUrl) {
+            console.log('Found download URL with selector:', sel, downloadUrl);
+            break;
+          }
+        }
+      }
+
+      // Search all links
+      if (!downloadUrl) {
+        $('a').each((_: number, el: any): void => {
+          const href = $(el).attr('href') || '';
+          if (href && (href.includes('/download') || href.includes('/dl/'))) {
+            downloadUrl = href;
+          }
         });
-
-        clearTimeout(timeout);
-
-        if (!response.ok) {
-          console.error(
-            'File page fetch failed with status:',
-            response.status
-          );
-          return null;
-        }
-
-        const html = await response.text();
-        const $ = cheerio.load(html);
-
-        let filename =
-          $('meta[property="og:title"]').attr('content') ||
-          $('h1').first().text().trim() ||
-          'download';
-
-        let downloadUrl =
-          $('a[href*="/download"]').attr('href') ||
-          $('a[download]').attr('href') ||
-          $('a.btn-success').attr('href') ||
-          $('a.download-btn').attr('href') ||
-          '';
-
-        if (!downloadUrl) {
-          $('a').each((_: number, el: any): boolean | void => {
-            const href = $(el).attr('href') || '';
-            if (href.includes('download') || href.includes('/d/')) {
-              downloadUrl = href;
-              return false;
-            }
-          });
-        }
-
-        if (!downloadUrl) {
-          console.error('Could not find download URL in page HTML');
-          return null;
-        }
-
-        if (!downloadUrl.startsWith('http')) {
-          downloadUrl = new URL(downloadUrl, 'https://fileaxa.com').toString();
-        }
-
-        filename = filename.replace(/[^a-z0-9._-]/gi, '_').substring(0, 100);
-        console.log('Download URL extracted:', downloadUrl.substring(0, 50) + '...');
-        console.log('Filename extracted:', filename);
-        return { url: downloadUrl, filename };
-      } finally {
-        clearTimeout(timeout);
       }
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
-        console.error('File page fetch TIMEOUT after 15 seconds');
-      } else {
-        console.error('Error extracting download URL:', error.message);
+
+      // Log page for debugging
+      if (!downloadUrl) {
+        console.log('No download URL found. Page excerpt:', html.substring(0, 2000));
       }
+
+      if (!downloadUrl) return null;
+
+      if (!downloadUrl.startsWith('http')) {
+        downloadUrl = new URL(downloadUrl, 'https://fileaxa.com').toString();
+      }
+
+      filename = filename
+        .replace(/[^a-z0-9._\-\s]/gi, '_')
+        .trim()
+        .substring(0, 100);
+      return { url: downloadUrl, filename };
+    } catch (e: any) {
+      console.error('getDirectDownloadUrl error:', e.message);
       return null;
     }
   }
@@ -219,22 +195,13 @@ export class FilexaClient {
     filexaUrl: string,
     username: string,
     password: string
-  ): Promise<FilexaFile | null> {
-    console.log('=== FILEAXA CLIENT RESOLVE START ===');
-    console.log('URL:', filexaUrl);
-    console.log('Username:', username);
-
-    const loginSuccess = await this.login(username, password);
-    console.log('Login success:', loginSuccess);
-
-    if (!loginSuccess) {
-      throw new Error('Invalid FileAxa credentials');
-    }
-
+  ): Promise<{ url: string; filename: string } | null> {
+    console.log('=== resolveFileUrl START ===');
+    const loginOk = await this.login(username, password);
+    console.log('Login result:', loginOk);
+    if (!loginOk) throw new Error('Invalid FileAxa credentials');
     const result = await this.getDirectDownloadUrl(filexaUrl);
-    console.log('Resolve result:', result ? 'success' : 'failed');
-    console.log('=== FILEAXA CLIENT RESOLVE END ===');
-
+    console.log('Resolve result:', result);
     return result;
   }
 }
