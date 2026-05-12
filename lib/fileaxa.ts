@@ -25,6 +25,7 @@ export class FilexaClient {
   async getCsrfToken(signal?: AbortSignal): Promise<string> {
     const startTime = Date.now();
     try {
+      console.log(`[getCsrfToken] Fetching login page...`);
       const res = await fetch('https://fileaxa.com/login', {
         headers: {
           'User-Agent':
@@ -35,6 +36,8 @@ export class FilexaClient {
         },
         signal,
       });
+      console.log(`[getCsrfToken] Fetch completed in ${Date.now() - startTime}ms`);
+      
       // Parse ALL set-cookie headers
       const rawHeaders = res.headers.getSetCookie?.() || [];
       rawHeaders.forEach((c: string) => this.parseCookies(c));
@@ -42,25 +45,26 @@ export class FilexaClient {
       this.parseCookies(res.headers.get('set-cookie'));
 
       const html = await res.text();
+      console.log(`[getCsrfToken] HTML parsed in ${Date.now() - startTime}ms (${html.length} bytes)`);
+      
       const $ = cheerio.load(html);
       const token =
         $('input[name="_token"]').attr('value') ||
         $('meta[name="csrf-token"]').attr('content') ||
         '';
-      console.log('CSRF token:', token ? 'found' : 'not found');
-      console.log('Cookies after GET:', this.getCookieString());
-      console.log(`getCsrfToken completed in ${Date.now() - startTime}ms`);
+      console.log(`[getCsrfToken] Completed in ${Date.now() - startTime}ms, token: ${token ? 'found' : 'not found'}`);
       return token;
     } catch (e: any) {
-      console.error('getCsrfToken error:', e.message, `after ${Date.now() - startTime}ms`);
+      console.error(`[getCsrfToken] Error after ${Date.now() - startTime}ms:`, e.message);
       return '';
     }
   }
 
   async login(username: string, password: string, signal?: AbortSignal): Promise<boolean> {
     const startTime = Date.now();
+    console.log(`[login] Starting CSRF token fetch...`);
     const token = await this.getCsrfToken(signal);
-    console.log(`getCsrfToken took ${Date.now() - startTime}ms in login()`);
+    console.log(`[login] CSRF took ${Date.now() - startTime}ms, token: ${token ? 'found' : 'not found'}`);
     try {
       const body = new URLSearchParams();
       body.append('username', username);
@@ -68,7 +72,7 @@ export class FilexaClient {
       body.append('remember', '1');
       if (token) body.append('_token', token);
 
-      console.log('Attempting login with cookie:', this.getCookieString());
+      console.log(`[login] Starting login POST at ${Date.now() - startTime}ms...`);
 
       const res = await fetch('https://fileaxa.com/login', {
         method: 'POST',
@@ -92,14 +96,13 @@ export class FilexaClient {
       rawHeaders.forEach((c: string) => this.parseCookies(c));
       this.parseCookies(res.headers.get('set-cookie'));
 
-      console.log('Login status:', res.status);
+      console.log(`[login] POST completed in ${Date.now() - startTime}ms, status: ${res.status}`);
       console.log('Cookies after login:', this.getCookieString());
-      console.log(`login() completed in ${Date.now() - startTime}ms`);
 
       const hasCookies = Object.keys(this.cookies).length > 0;
       return res.status === 302 || res.status === 200 || hasCookies;
     } catch (e: any) {
-      console.error('Login error:', e.message, `after ${Date.now() - startTime}ms`);
+      console.error(`[login] Error after ${Date.now() - startTime}ms:`, e.message);
       return false;
     }
   }
@@ -199,21 +202,27 @@ export class FilexaClient {
     password: string
   ): Promise<{ url: string; filename: string } | null> {
     console.log('=== resolveFileUrl START ===');
-    // Single global timeout for entire operation: 85 seconds
+    const overallStart = Date.now();
+    // Single global timeout for entire operation: 100 seconds
+    // FileAza is consistently 80+ seconds slow
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
-      console.error('resolveFileUrl: Global timeout fired after 85 seconds');
+      console.error(`resolveFileUrl: Global timeout fired after ${Date.now() - overallStart}ms`);
       controller.abort();
-    }, 85000);
+    }, 100000);
 
     try {
+      console.log(`[${Date.now() - overallStart}ms] Starting login...`);
       const loginOk = await this.login(username, password, controller.signal);
-      console.log('Login result:', loginOk);
+      console.log(`[${Date.now() - overallStart}ms] Login result:`, loginOk);
       if (!loginOk) throw new Error('Invalid FileAxa credentials');
+      
+      console.log(`[${Date.now() - overallStart}ms] Starting getDirectDownloadUrl...`);
       const result = await this.getDirectDownloadUrl(filexaUrl, controller.signal);
-      console.log('Resolve result:', result);
+      console.log(`[${Date.now() - overallStart}ms] Resolve result:`, result);
       return result;
     } finally {
+      console.log(`=== resolveFileUrl END (total: ${Date.now() - overallStart}ms) ===`);
       clearTimeout(timeoutId);
     }
   }
