@@ -30,10 +30,10 @@ export async function POST(request: NextRequest) {
     console.log('Login result:', result ? 'success' : 'failed');
 
     if (!result) {
-      console.log('Could not resolve download URL');
+      console.log('Could not resolve download URL - timeout or FileAza error');
       return NextResponse.json(
-        { error: 'Could not resolve download URL' },
-        { status: 404 }
+        { error: 'Could not resolve download URL. FileAza may be slow or require login.' },
+        { status: 500 }
       );
     }
 
