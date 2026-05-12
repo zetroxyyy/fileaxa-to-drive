@@ -93,7 +93,7 @@ export class FilexaClient {
         '';
 
       if (!downloadUrl) {
-        $('a').each((_: number, el: any) => {
+        $('a').each((_: number, el: any): boolean | void => {
           const href = $(el).attr('href') || '';
           if (href.includes('download') || href.includes('/d/')) {
             downloadUrl = href;
