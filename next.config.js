@@ -20,12 +20,7 @@ const nextConfig = {
     return config;
   },
   experimental: {
-    serverComponentsExternalPackages: [
-      'http-cookie-agent',
-      'tough-cookie',
-      'axios',
-      'cheerio',
-    ],
+    serverComponentsExternalPackages: ['cheerio'],
   },
 };
 

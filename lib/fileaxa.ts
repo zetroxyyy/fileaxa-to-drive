@@ -1,7 +1,4 @@
-import axios, { AxiosInstance } from 'axios';
 import * as cheerio from 'cheerio';
-import { CookieJar } from 'tough-cookie';
-import { HttpCookieAgent, HttpsCookieAgent } from 'http-cookie-agent/http';
 
 interface FilexaFile {
   url: string;
@@ -9,37 +6,55 @@ interface FilexaFile {
 }
 
 export class FilexaClient {
-  private axiosInstance: AxiosInstance;
-  private cookieJar: CookieJar;
+  private cookies: string = '';
 
-  constructor() {
-    this.cookieJar = new CookieJar();
-    this.axiosInstance = axios.create({
-      httpAgent: new HttpCookieAgent({ cookies: { jar: this.cookieJar } }),
-      httpsAgent: new HttpsCookieAgent({ cookies: { jar: this.cookieJar } }),
-      timeout: 10000,
-    });
+  private async fetchWithTimeout(
+    url: string,
+    options: RequestInit = {},
+    timeoutMs: number = 10000
+  ): Promise<Response> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      return await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   async login(username: string, password: string): Promise<boolean> {
     try {
-      const response = await this.axiosInstance.post(
+      const response = await this.fetchWithTimeout(
         'https://fileaxa.com/login',
-        new URLSearchParams({
-          username,
-          password,
-          remember: '1',
-        }),
         {
+          method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
             'User-Agent':
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept':
+              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
           },
-        }
+          body: new URLSearchParams({ username, password, remember: '1' }),
+          redirect: 'follow',
+        },
+        10000
       );
 
-      return response.status === 200;
+      // Extract cookies from response headers
+      const setCookie = response.headers.get('set-cookie');
+      if (setCookie) {
+        this.cookies = setCookie
+          .split(',')
+          .map((c) => c.split(';')[0].trim())
+          .join('; ');
+      }
+
+      return response.ok || response.status === 302;
     } catch (error) {
       console.error('FileAxa login failed:', error);
       return false;
@@ -48,45 +63,43 @@ export class FilexaClient {
 
   async getDirectDownloadUrl(filePageUrl: string): Promise<FilexaFile | null> {
     try {
-      const response = await this.axiosInstance.get(filePageUrl, {
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      const response = await this.fetchWithTimeout(
+        filePageUrl,
+        {
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Cookie': this.cookies,
+            'Accept':
+              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          },
         },
-      });
+        10000
+      );
 
-      const $ = cheerio.load(response.data);
+      const html = await response.text();
+      const $ = cheerio.load(html);
 
-      let filename = '';
-      let downloadUrl = '';
-
-      // Try to find filename in meta tags or header
-      filename =
+      let filename =
         $('meta[property="og:title"]').attr('content') ||
         $('h1').first().text().trim() ||
         'download';
 
-      // Look for download button/link - FileAxa patterns:
-      // 1. Direct download link in button or <a> tag
-      downloadUrl =
+      let downloadUrl =
         $('a[href*="/download"]').attr('href') ||
         $('a[download]').attr('href') ||
-        $('button[onclick*="download"]').attr('onclick') ||
+        $('a.btn-success').attr('href') ||
+        $('a.download-btn').attr('href') ||
         '';
 
-      // If found onclick, extract URL from it
-      if (downloadUrl.includes('window.location')) {
-        const match = downloadUrl.match(/'([^']+)'|"([^"]+)"/);
-        downloadUrl = match ? match[1] || match[2] : '';
-      }
-
-      // Look for form submissions with file URL
       if (!downloadUrl) {
-        const form = $('form[method="POST"]').first();
-        if (form.length) {
-          const action = form.attr('action');
-          downloadUrl = action || '';
-        }
+        $('a').each((_: number, el: any) => {
+          const href = $(el).attr('href') || '';
+          if (href.includes('download') || href.includes('/d/')) {
+            downloadUrl = href;
+            return false;
+          }
+        });
       }
 
       if (!downloadUrl) {
@@ -94,14 +107,11 @@ export class FilexaClient {
         return null;
       }
 
-      // Ensure absolute URL
       if (!downloadUrl.startsWith('http')) {
         downloadUrl = new URL(downloadUrl, 'https://fileaxa.com').toString();
       }
 
-      // Clean filename
       filename = filename.replace(/[^a-z0-9._-]/gi, '_').substring(0, 100);
-
       return { url: downloadUrl, filename };
     } catch (error) {
       console.error('Error extracting download URL:', error);
