@@ -25,7 +25,7 @@ export class FilexaClient {
   async getCsrfToken(): Promise<string> {
     const startTime = Date.now();
     const controller = new AbortController();
-    setTimeout(() => controller.abort(), 55000);
+    setTimeout(() => controller.abort(), 70000);
     try {
       const res = await fetch('https://fileaxa.com/login', {
         headers: {
@@ -64,7 +64,7 @@ export class FilexaClient {
     const token = await this.getCsrfToken();
     console.log(`getCsrfToken took ${Date.now() - startTime}ms in login()`);
     const controller = new AbortController();
-    setTimeout(() => controller.abort(), 55000);
+    setTimeout(() => controller.abort(), 70000);
     try {
       const body = new URLSearchParams();
       body.append('username', username);
@@ -113,7 +113,7 @@ export class FilexaClient {
   ): Promise<{ url: string; filename: string } | null> {
     const startTime = Date.now();
     const controller = new AbortController();
-    setTimeout(() => controller.abort(), 55000);
+    setTimeout(() => controller.abort(), 70000);
     try {
       console.log('Fetching file page with cookies:', this.getCookieString());
       const res = await fetch(filePageUrl, {

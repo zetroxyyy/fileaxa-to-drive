@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { FilexaClient } from '@/lib/fileaxa';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 120;
+export const maxDuration = 90;
 
 export async function POST(request: NextRequest) {
   console.log('=== RESOLVE START ===');
