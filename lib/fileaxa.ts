@@ -23,8 +23,9 @@ export class FilexaClient {
   }
 
   async getCsrfToken(): Promise<string> {
+    const startTime = Date.now();
     const controller = new AbortController();
-    setTimeout(() => controller.abort(), 45000);
+    setTimeout(() => controller.abort(), 55000);
     try {
       const res = await fetch('https://fileaxa.com/login', {
         headers: {
@@ -50,17 +51,20 @@ export class FilexaClient {
         '';
       console.log('CSRF token:', token ? 'found' : 'not found');
       console.log('Cookies after GET:', this.getCookieString());
+      console.log(`getCsrfToken completed in ${Date.now() - startTime}ms`);
       return token;
     } catch (e: any) {
-      console.error('getCsrfToken error:', e.message);
+      console.error('getCsrfToken error:', e.message, `after ${Date.now() - startTime}ms`);
       return '';
     }
   }
 
   async login(username: string, password: string): Promise<boolean> {
+    const startTime = Date.now();
     const token = await this.getCsrfToken();
+    console.log(`getCsrfToken took ${Date.now() - startTime}ms in login()`);
     const controller = new AbortController();
-    setTimeout(() => controller.abort(), 45000);
+    setTimeout(() => controller.abort(), 55000);
     try {
       const body = new URLSearchParams();
       body.append('username', username);
@@ -94,11 +98,12 @@ export class FilexaClient {
 
       console.log('Login status:', res.status);
       console.log('Cookies after login:', this.getCookieString());
+      console.log(`login() completed in ${Date.now() - startTime}ms`);
 
       const hasCookies = Object.keys(this.cookies).length > 0;
       return res.status === 302 || res.status === 200 || hasCookies;
     } catch (e: any) {
-      console.error('Login error:', e.message);
+      console.error('Login error:', e.message, `after ${Date.now() - startTime}ms`);
       return false;
     }
   }
@@ -106,8 +111,9 @@ export class FilexaClient {
   async getDirectDownloadUrl(
     filePageUrl: string
   ): Promise<{ url: string; filename: string } | null> {
+    const startTime = Date.now();
     const controller = new AbortController();
-    setTimeout(() => controller.abort(), 45000);
+    setTimeout(() => controller.abort(), 55000);
     try {
       console.log('Fetching file page with cookies:', this.getCookieString());
       const res = await fetch(filePageUrl, {
@@ -184,9 +190,10 @@ export class FilexaClient {
         .replace(/[^a-z0-9._\-\s]/gi, '_')
         .trim()
         .substring(0, 100);
+      console.log(`getDirectDownloadUrl completed in ${Date.now() - startTime}ms`);
       return { url: downloadUrl, filename };
     } catch (e: any) {
-      console.error('getDirectDownloadUrl error:', e.message);
+      console.error('getDirectDownloadUrl error:', e.message, `after ${Date.now() - startTime}ms`);
       return null;
     }
   }
