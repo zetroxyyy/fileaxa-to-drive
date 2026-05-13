@@ -5,8 +5,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY .npmrc ./
 
-# Install dependencies with optimizations
-RUN npm ci --only=production --no-audit --no-fund --prefer-offline
+# Install dependencies with optimizations, including dev dependencies needed for build
+RUN npm ci --no-audit --no-fund --prefer-offline
 
 # Copy source code
 COPY . .
