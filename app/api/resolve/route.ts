@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { FilexaClient } from '@/lib/fileaxa';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 90;
+export const maxDuration = 70;
 
 export async function POST(request: NextRequest) {
   console.log('=== RESOLVE START ===');
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
     console.log('Login result:', result ? 'success' : 'failed');
 
-    if (!result) {
+    if (!result || !result.url) {
       console.log('Could not resolve download URL - timeout or FileAza error');
       return NextResponse.json(
         { error: 'Could not resolve download URL. FileAza may be slow or require login.' },
@@ -40,7 +40,10 @@ export async function POST(request: NextRequest) {
     console.log('Resolve result:', { url: result.url.substring(0, 50) + '...', filename: result.filename });
     console.log('=== RESOLVE SUCCESS ===');
     
-    return NextResponse.json(result);
+    return NextResponse.json({
+      directUrl: result.url,
+      filename: result.filename,
+    });
   } catch (error: any) {
     console.error('=== RESOLVE ERROR ===');
     console.error('Error type:', error?.constructor?.name);

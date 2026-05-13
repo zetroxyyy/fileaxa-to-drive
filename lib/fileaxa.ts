@@ -203,19 +203,22 @@ export class FilexaClient {
   ): Promise<{ url: string; filename: string } | null> {
     console.log('=== resolveFileUrl START ===');
     const overallStart = Date.now();
-    // Single global timeout for entire operation: 100 seconds
-    // FileAza is consistently 80+ seconds slow
+    // Single global timeout for entire operation: 70 seconds
+    // This keeps the request under typical HTTP gateway limits.
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
       console.error(`resolveFileUrl: Global timeout fired after ${Date.now() - overallStart}ms`);
       controller.abort();
-    }, 100000);
+    }, 70000);
 
     try {
       console.log(`[${Date.now() - overallStart}ms] Starting login...`);
       const loginOk = await this.login(username, password, controller.signal);
       console.log(`[${Date.now() - overallStart}ms] Login result:`, loginOk);
-      if (!loginOk) throw new Error('Invalid FileAxa credentials');
+      if (!loginOk) {
+        console.error('resolveFileUrl: Login failed or timed out');
+        return null;
+      }
       
       console.log(`[${Date.now() - overallStart}ms] Starting getDirectDownloadUrl...`);
       const result = await this.getDirectDownloadUrl(filexaUrl, controller.signal);
